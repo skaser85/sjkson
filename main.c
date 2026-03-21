@@ -191,14 +191,10 @@ void Tokenize(String_Builder file_data, Tokens* tokens) {
             sb_append(&n, c);
             while (i < file_data.count) {
                 c = file_data.items[++i];
-                /*if (c == '"' || c == ',' || 
-                    c == '{' || c == '}' || 
-                    c == '[' || c == ']' ||
-                    isspace(c)) {*/
-                if (c == '"' ||
-                    sb_eq_jbool(n) ||
-                    sb_eq_jnull(n)) {
+                if (c == '"') { 
                     --i;
+                    break;
+                } else if (sb_eq_jbool(n) || sb_eq_jnull(n)) {
                     break;
                 }
                 sb_append(&n, c);
@@ -217,25 +213,7 @@ void Tokenize(String_Builder file_data, Tokens* tokens) {
 
 }
 
-
-int main(void) {
-    const char* src_file_path = "./64KB2.json";
-
-    String_Builder sb = {0};
-    if (!read_entire_file(src_file_path, &sb)) return 1;
-
-    Tokens tokens = {0};
-    JSON_Elements json = {0};
-    
-    Tokenize(sb, &tokens); 
-    ParseTokens(tokens, &json);
-    /*
-    for (size_t i = 0; i < tokens.count; ++i) {
-        nob_log(INFO, SV_Fmt, SV_Arg(tokens.items[i].value));
-    }
-    */
-
-    nob_log(INFO, "%ld", json.count);
+void print_json(JSON_Elements json) {
     for (size_t i = 0; i < json.count; ++i) {
         JSON_Element j = json.items[i];
         if (j.kind == JSON_STRING) {
@@ -248,6 +226,21 @@ int main(void) {
           nob_log(INFO, "\nkey: "SV_Fmt"\nvalue: null", SV_Arg(j.key));
         }
     }
+}
+
+int main(void) {
+    const char* src_file_path = "./64KB2.json";
+
+    String_Builder sb = {0};
+    if (!read_entire_file(src_file_path, &sb)) return 1;
+
+    Tokens tokens = {0};
+    JSON_Elements json = {0};
+    
+    Tokenize(sb, &tokens); 
+    ParseTokens(tokens, &json);
+    
+    print_json(json);
 
     return 0;
 }
