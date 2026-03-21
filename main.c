@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 #define NOB_IMPLEMENTATION
 #include "./nob.h"
@@ -64,6 +65,21 @@ String_View* sv_dup(String_View isv) {
   osv->count = isv.count;
   osv->data = strdup(isv.data);
   return osv;
+}
+
+bool sb_eq_jbool(String_Builder sb) {
+    if (sb.count != 4 && sb.count != 5) return false;
+    String_View sv = sb_to_sv(sb);
+    const char* str = temp_sv_to_cstr(sv);
+    if (sb.count == 4)
+        return strcmp(str, "true") == 0;
+    return strcmp(str, "false") == 0;
+}
+
+bool sb_eq_jnull(String_Builder sb) {
+    if (sb.count != 4) return false;
+    String_View sv = sb_to_sv(sb);
+    return strcmp(temp_sv_to_cstr(sv), "null") == 0;
 }
 
 void ParseTokens(Tokens tokens, JSON_Elements* root) {
@@ -175,10 +191,13 @@ void Tokenize(String_Builder file_data, Tokens* tokens) {
             sb_append(&n, c);
             while (i < file_data.count) {
                 c = file_data.items[++i];
-                if (c == '"' || c == ',' || 
+                /*if (c == '"' || c == ',' || 
                     c == '{' || c == '}' || 
                     c == '[' || c == ']' ||
-                    isspace(c)) {
+                    isspace(c)) {*/
+                if (c == '"' ||
+                    sb_eq_jbool(n) ||
+                    sb_eq_jnull(n)) {
                     --i;
                     break;
                 }
@@ -220,11 +239,11 @@ int main(void) {
     for (size_t i = 0; i < json.count; ++i) {
         JSON_Element j = json.items[i];
         if (j.kind == JSON_STRING) {
-          nob_log(INFO, "\nkey: %s\nvalue: %s", j.key.data, j.value.jstring.data);
+          nob_log(INFO, "\nkey: %s\nvalue: "SV_Fmt, j.key.data, SV_Arg(j.value.jstring));
         } else if (j.kind == JSON_NUM) {
           nob_log(INFO, "\nkey: %s\nvalue: %f", j.key.data, j.value.jnum);
         } else if (j.kind == JSON_BOOL) {
-          nob_log(INFO, "\nkey: %s\nvalue: %b", j.key.data, j.value.jbool);
+          nob_log(INFO, "\nkey: %s\nvalue: %d", j.key.data, j.value.jbool);
         } else if (j.kind == JSON_NULL) {
           nob_log(INFO, "\nkey: %s\nvalue: null", j.key.data);
         }
