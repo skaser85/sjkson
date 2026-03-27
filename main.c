@@ -42,19 +42,6 @@ typedef enum {
   JSON_COUNT
 } JSON_Kind;
 
-const char* get_json_kind(JSON_Kind kind) {
-  switch (kind) {
-    case JSON_NONE: return "none";
-    case JSON_ARRAY: return "array";
-    case JSON_OBJECT: return "object";
-    case JSON_STRING: return "string";
-    case JSON_NUM: return "num";
-    case JSON_BOOL: return "bool";
-    case JSON_NULL: return "null";
-    default: return "";
-  }
-}
-
 typedef struct JSON_Element JSON_Element;
 typedef struct JSON_Elements JSON_Elements;
 
@@ -91,6 +78,21 @@ const char* get_token_kind(Token_Kind kind) {
     default: return "";
   }
 }
+
+const char* get_json_kind(JSON_Kind kind) {
+  switch (kind) {
+    case JSON_NONE: return "none";
+    case JSON_ARRAY: return "array";
+    case JSON_OBJECT: return "object";
+    case JSON_STRING: return "string";
+    case JSON_NUM: return "num";
+    case JSON_BOOL: return "bool";
+    case JSON_NULL: return "null";
+    default: return "";
+  }
+}
+
+
 String_View* sv_dup(String_View isv) {
   String_View* osv = (String_View*)malloc(sizeof(String_View));
   osv->count = isv.count;
@@ -104,13 +106,14 @@ JSON_Element* make_json_element(JSON_Kind kind, String_View* key) {
   JSON_Element* j = (JSON_Element*)malloc(sizeof(JSON_Element));
   memset(j, 0, sizeof(*j));
   j->kind = kind;
-  if (kind == JSON_ARRAY)
-    j->value.jarray = make_json_elements();
-  if (kind == JSON_OBJECT)
-    j->value.jobject = make_json_elements();
-  j->value.jstring = sv_from_cstr("");
-  j->value.jnum = 0;
-  j->value.jbool = false;
+  switch (kind) {
+    case JSON_ARRAY: j->value.jarray = make_json_elements(); break;
+    case JSON_OBJECT: j->value.jobject = make_json_elements(); break;
+    case JSON_STRING: j->value.jstring = sv_from_parts("", 0); break;
+    case JSON_NUM: j->value.jnum = 0; break;
+    case JSON_BOOL: j->value.jbool = false; break;
+    default: {};
+  }
   if (key && key->count > 0)
     j->key = *sv_dup(*key);
   return j;
@@ -119,6 +122,53 @@ JSON_Element* make_json_element(JSON_Kind kind, String_View* key) {
 JSON_Elements* make_json_elements() {
   JSON_Elements* j = (JSON_Elements*)malloc(sizeof(JSON_Element));
   memset(j, 0, sizeof(*j));
+  return j;
+}
+
+String_View* make_sv(const char* str) {
+  String_View* sv = (String_View*)malloc(sizeof(String_View));
+  memset(sv, 0, sizeof(*sv));
+  sv->data = strdup(str);
+  sv->count = strlen(str)-1;
+  return sv;
+}
+
+JSON_Element* make_json_string(const char* key, const char* value) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_STRING, &keysv);
+  j->value.jstring = sv_from_cstr(value);
+  return j;
+}
+
+JSON_Element* make_json_num(const char* key, double num) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_NUM, &keysv);
+  j->value.jnum = num;
+  return j;
+}
+
+JSON_Element* make_json_bool(const char* key, bool b) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_BOOL, &keysv);
+  j->value.jbool = b;
+  return j;
+}
+
+JSON_Element* make_json_null(const char* key) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_NULL, &keysv);
+  return j;
+}
+
+JSON_Element* make_json_object(const char* key) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_OBJECT, &keysv);
+  return j;
+}
+
+JSON_Element* make_json_array(const char* key) {
+  String_View keysv = sv_from_cstr(key);
+  JSON_Element* j = make_json_element(JSON_ARRAY, &keysv);
   return j;
 }
 
@@ -172,7 +222,7 @@ JSON_Element* get_last(JSON_Elements* root) {
     return NULL;
   return &da_last(root);
 }
-
+/*
 JSON_Elements* ParseTokens(Tokens* tokens) {
   JSON_Elements* root = make_json_elements();
   Token* t = token_get_next(tokens);
@@ -267,7 +317,7 @@ JSON_Elements* ParseTokens(Tokens* tokens) {
   }
   return root;
 }
-
+*/
 const char* sb_to_cstr(String_Builder *sb) {
   char* s = (char*)malloc(sizeof(char)*sb->count+1);
   for (size_t i = 0; i < sb->count; ++i){
@@ -378,53 +428,40 @@ void print_json_element(JSON_Element j, size_t indent_amt) {
   print_sb(sb);
 }
 
-void print_json(JSON_Elements json, size_t indent_amt) {
-  if (json.count == 0) return;
-  for (size_t i = 0; i < json.count; ++i) {
-    JSON_Element j = json.items[i];
-    switch (j.kind) {
-    case JSON_ARRAY: {
-      String_Builder sb = {0};
-      get_spaces(&sb, indent_amt);
-      if (j.key.count > 0) { 
-        sb_appendf(&sb, "\""SV_Fmt"\": [", SV_Arg(j.key));
-      } else {
-        sb_appendf(&sb, "[");
-      }
-      print_sb(sb);
-      
+void print_json_collection(JSON_Element* j, size_t indent_amt);
 
-      indent_amt += PRETTY_PRINT_SPACES_AMT;
-      print_json(*j.value.jarray, indent_amt);
-      indent_amt -= PRETTY_PRINT_SPACES_AMT;
-      
-      sb.count = 0;
-      get_spaces(&sb, indent_amt);
-      sb_appendf(&sb, "]");
-      print_sb(sb);
-    } break;
-    case JSON_OBJECT: {
-      String_Builder sb = {0};
-      get_spaces(&sb, indent_amt);
-      if (j.key.count > 0) { 
-        sb_appendf(&sb, "\""SV_Fmt"\": {", SV_Arg(j.key));
-      } else {
-        sb_appendf(&sb, "{");
-      }
-      print_sb(sb);
-      
-      indent_amt += PRETTY_PRINT_SPACES_AMT;
-      print_json(*j.value.jarray, indent_amt);
-      indent_amt -= PRETTY_PRINT_SPACES_AMT;
-      
-      sb.count = 0;
-      get_spaces(&sb, indent_amt);
-      sb_appendf(&sb, "}");
-      print_sb(sb);
-    } break;
-    default: print_json_element(j, indent_amt);
-    }
+void print_json(JSON_Element* json, size_t indent_amt) {
+  switch(json->kind) {
+    case JSON_ARRAY: print_json_collection(json, indent_amt); break;
+    case JSON_OBJECT: print_json_collection(json, indent_amt); break;
+    default: print_json_element(*json, indent_amt);
   }
+}
+
+void print_json_collection(JSON_Element* j, size_t indent_amt) {
+  char opening = j->kind == JSON_ARRAY ? '[' : '{'; 
+  char closing = j->kind == JSON_ARRAY ? ']' : '}';
+  JSON_Elements* els = j->kind == JSON_ARRAY ? j->value.jarray : j->value.jobject;
+
+  String_Builder sb = {0};
+  get_spaces(&sb, indent_amt);
+  if (j->key.count > 0) { 
+    sb_appendf(&sb, "\""SV_Fmt"\": %c", SV_Arg(j->key), opening);
+  } else {
+    sb_append(&sb, opening);
+  }
+  print_sb(sb);
+  
+  indent_amt += PRETTY_PRINT_SPACES_AMT;
+  for (size_t i = 0; i < els->count; ++i) {
+    print_json(&els->items[i], indent_amt);
+  }
+  indent_amt -= PRETTY_PRINT_SPACES_AMT;
+  
+  sb.count = 0;
+  get_spaces(&sb, indent_amt);
+  sb_append(&sb, closing);
+  print_sb(sb);
 }
 
 void print_tokens(Tokens tokens) {
@@ -439,21 +476,73 @@ void print_tokens(Tokens tokens) {
     ++i;
   }
 }
-
-int main(void) {
-  const char* src_file_path = "./64KB.json";
-  //const char* src_file_path = "./products.json";
-  //const char* src_file_path = "./simple.json";
-
+/*
+JSON_Element* parse_json_file(const char* src_file_path) {
   String_Builder sb = {0};
-  if (!read_entire_file(src_file_path, &sb)) return 1;
+  if (!read_entire_file(src_file_path, &sb)) return NULL;
 
   Tokens tokens = {0};
   Tokenize(sb, &tokens); 
-  //print_tokens(tokens);
   
   JSON_Elements* json = ParseTokens(&tokens);
-  print_json(*json, 0);
+
+  return json;
+}
+*/
+void append_to_json(JSON_Elements* root, JSON_Element* j) {
+  da_append(root, *j);
+}
+
+typedef struct {
+  JSON_Elements** items;
+  size_t count;
+  size_t capacity;
+} Roots;
+
+JSON_Elements* push_root(Roots* roots, JSON_Elements* new_root) {
+  da_append(roots, new_root);
+  return new_root;
+}
+
+JSON_Elements* pull_root(Roots* roots) {
+  if (roots->count == 0) return NULL;
+  roots->count -= 1;
+  if (roots->count == 0) return NULL;
+  return da_last(roots);
+}
+
+JSON_Element* test_make_json() {
+  Roots roots = {0};
+  
+  JSON_Element* r = make_json_array("");
+  JSON_Elements* root = push_root(&roots, r->value.jarray);
+
+  JSON_Element* o1 = make_json_object("");
+  append_to_json(root, o1);
+  root = push_root(&roots, o1->value.jobject);
+
+  append_to_json(root, make_json_string("name", "France"));
+  append_to_json(root, make_json_string("capital", "Paris"));
+  append_to_json(root, make_json_num("population", 67364357));
+  append_to_json(root,  make_json_num("area", 551695));
+  append_to_json(root, make_json_string("currency", "Euro"));
+  JSON_Element* lang = make_json_array("languages");
+  root = push_root(&roots, lang->value.jarray);
+  append_to_json(root, make_json_string("", "French")); 
+  root = pull_root(&roots);
+  append_to_json(root, lang);
+  append_to_json(root, make_json_string("region", "Europe"));
+  append_to_json(root, make_json_string("subregion", "Western Europe"));
+  append_to_json(root, make_json_string("subregion", "https://upload.wikimedia.org/wikipedia/commons/c/c3/Flag_of_France.svg"));
+
+  root = pull_root(&roots);
+
+  return r;
+}
+
+int main(void) {
+  JSON_Element* json = test_make_json();
+  print_json(json, 0);
 
   return 0;
 }
