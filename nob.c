@@ -16,8 +16,10 @@ int main(int argc, char **argv)
 {
     GO_REBUILD_URSELF(argc, argv);
 
+    char* prog = "";
     bool run = false;
     bool help = false;
+    flag_str_var(&prog, "prog", "main", "Supply the file name to run (default is 'main')");
     flag_bool_var(&run, "run", false, "Run the program after compilation.");
     flag_bool_var(&help, "help", false, "Print this help message.");
 
@@ -31,12 +33,18 @@ int main(int argc, char **argv)
         usage();
         return 0;
     }
+    
+    char output_file_name[100];
+    sprintf(output_file_name, "./%s", prog);
+
+    char input_file_name[100];
+    sprintf(input_file_name, "%s.c", prog);
 
     cmd_append(&cmd, "cc");
     cmd_append(&cmd, "-Wall");
     cmd_append(&cmd, "-Wextra");
     cmd_append(&cmd, "-ggdb");
-    cmd_append(&cmd, "-o", "./main", "main.c");
+    cmd_append(&cmd, "-o", output_file_name, input_file_name);
     /*
     cmd_append(&cmd, "-I./raylib-5.5_linux_amd64/include/");
     cmd_append(&cmd, "-L./raylib-5.5_linux_amd64/lib/");
@@ -46,7 +54,7 @@ int main(int argc, char **argv)
     if (!cmd_run(&cmd)) return 1;
 
     if (run) {
-        cmd_append(&cmd, "./main");
+        cmd_append(&cmd, output_file_name);
         da_append_many(&cmd, argv, argc);
         if (!cmd_run(&cmd)) return 1;
     }
