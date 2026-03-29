@@ -34,12 +34,16 @@ int main(int argc, char **argv)
         return 0;
     }
     
+    String_View sv = sv_from_cstr(prog);
+    sv_chop_suffix(&sv, sv_from_cstr(".c"));
+    prog = (char*)temp_sv_to_cstr(sv);
+    
     char output_file_name[100];
     sprintf(output_file_name, "./%s", prog);
 
     char input_file_name[100];
     sprintf(input_file_name, "%s.c", prog);
-
+    
     cmd_append(&cmd, "cc");
     cmd_append(&cmd, "-Wall");
     cmd_append(&cmd, "-Wextra");
